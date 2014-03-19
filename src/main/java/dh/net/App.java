@@ -1,5 +1,7 @@
 package dh.net;
 
+import dh.net.dns.*;
+
 import java.io.*;
 import java.net.*;
 import java.util.*;
@@ -8,6 +10,8 @@ public class App
 {
     public static void main( String[] args )
     {
+        Question dnsQuestion = new Question.Builder().build();
+
     	if(args.length < 1)
     	{
     		System.out.println("Specify: client|server");
