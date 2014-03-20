@@ -5,6 +5,8 @@ import dh.net.dns.OpCode;
 import dh.net.dns.QClass;
 
 import java.util.Vector;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 /**
  *  Question represents a DNS question that can be asked to
@@ -45,7 +47,7 @@ public class Question
 
     public Builder setID(int val) { this.id = val; return this; }
     public Builder setOpCode(OpCode val) { this.opCode = val; return this; }
-    public Builder setRecursionFlag(boolean val)
+    public Builder setRecursionDesired(boolean val)
     {
       this.recursionDesired = val;
       return this;
@@ -89,6 +91,75 @@ public class Question
     }
   }
 
+  /**
+   *  Returns a byte array which can be sent directly to a DNS Server
+   *  in a UDP packet.
+   *
+   *  @return valid byte array.
+   */
+  public byte[] getPacket()
+  {
+    ByteBuffer buffer = ByteBuffer.allocate(MAX_UDP_PACKET_SIZE);
+    // Network byte order is big endian.
+    buffer.order(ByteOrder.BIG_ENDIAN);
+
+    // First store the ID number we've been given.
+    buffer.putShort((short)this.id);
+
+    // Next store the various flags as per the user's settings
+    //  MSB ---> LSB
+    //    0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
+    //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    //  |                      ID                       |
+    //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    //  |QR|   Opcode  |AA|TC|RD|RA|   Z    |   RCODE   |
+    //
+    int options = 0x000000;
+
+    // QR
+    if(this.isQuery)
+    {
+      int mask = 0x00000000;
+      options |= mask;
+    }
+
+    // OpCode
+    int opCode = this.opCode.getValue();
+    options |= opCode;
+
+    // Authoritative Answer
+    if(this.authorativeAnswer)
+    {
+      int mask = 0x400;
+      options |= mask;
+    }
+
+    // Recursion Desired
+    if(this.recursionDesired)
+    {
+      int mask = 0x100;
+      options |= mask;
+    }
+
+    // Take the first word and push into array.
+    buffer.putShort((short)options);
+
+    // Set number of questions, remainder of header is zeros.
+    buffer.putShort((short)questionCount);
+    // Answer Count == 0
+    buffer.putShort((short)0x0000);
+    // Name Server count == 0
+    buffer.putShort((short)0x0000);
+    // Additional Record Count == 0
+    buffer.putShort((short)0x0000);
+
+
+    // Fill out question section
+    
+
+    return buffer.array();
+  }
+
   private Question(Builder builder)
   {
     this.id = builder.id;
@@ -127,6 +198,12 @@ public class Question
   private final int additionalRecordCount;
 
   private Vector<QuestionRecord> questions;
+
+  // Constants
+  // TODO FOR TESTING
+  //private final int MAX_UDP_PACKET_SIZE = 65527;
+  private final int MAX_UDP_PACKET_SIZE = 512;
+
 }
 
 
