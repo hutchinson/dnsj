@@ -36,13 +36,27 @@ public class App
     System.out.println();
   }
 
+  public static void printQuestion(byte[] packet)
+  {
+    int offset = 12;
+    System.out.print("Domain Name: ");
+    while(offset < packet.length)
+    {
+      if(packet[offset] > 45)
+        System.out.print((char)packet[offset++]);
+      else
+        System.out.print(packet[offset++]);
+    }
+    System.out.println();
+  }
+
   public static void main( String[] args )
   {
     Question.Builder qb = new Question.Builder();
     qb.setID(1);
-    qb.setRecursionDesired(true);
-    //qb.setOpCode(OpCode.STATUS);
-    //qb.addQuestion("www.google.co.uk", QType.A, QClass.IN);
+    //qb.setRecursionDesired(true);
+    qb.setOpCode(OpCode.QUERY);
+    qb.addQuestion("www.google.co.uk", QType.A, QClass.IN);
 
     Question googleQuestion = qb.build();
 
@@ -51,6 +65,7 @@ public class App
     if(packetToSend != null)
     {
       App.printPacketAsBits(packetToSend, 12);
+      //App.printQuestion(packetToSend);
     }
 
     try
@@ -60,7 +75,8 @@ public class App
       DatagramSocket socket = new DatagramSocket();
       InetAddress addr = InetAddress.getByAddress(dnsIPAddress);
 
-      DatagramPacket datagramPacket = new DatagramPacket(packetToSend, 12, addr, 53);
+      DatagramPacket datagramPacket =
+        new DatagramPacket(packetToSend, packetToSend.length, addr, 53);
       socket.send(datagramPacket);
 
       // Get response

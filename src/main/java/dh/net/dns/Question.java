@@ -155,9 +155,65 @@ public class Question
 
 
     // Fill out question section
-    
+    for(int x = 0; x < questions.size(); ++x)
+    {
+      byte[] question = formatQuestion(questions.get(x));
+      buffer.put(question);
+    }
 
     return buffer.array();
+  }
+
+  private byte[] formatQuestion(QuestionRecord question)
+  {
+    byte[] formattedQName = formatDomainName(question.qname);
+    int totalBytes = 4 + formattedQName.length;
+    ByteBuffer qBuffer = ByteBuffer.allocate(totalBytes);
+
+    qBuffer.order(ByteOrder.BIG_ENDIAN);
+
+    // Fill the buffer.
+    qBuffer.put(formattedQName);
+    qBuffer.putShort((short)question.qtype.getValue());
+    qBuffer.putShort((short)question.qclass.getValue());
+
+    return qBuffer.array();
+  }
+
+  // TODO: Yuck, rewrite...
+  private byte[] formatDomainName(String domainName)
+  {
+    // www.google.co.uk
+    // 3www6google2co2uk0
+    byte[] result = new byte[ (domainName.length() + 2) ];
+    
+    // Starting at the end of str decant each char to the byte
+    // array, if '.' replace num previously counted chars.
+    int resultPtr = result.length - 2;
+    byte currLen = 0;
+    while(resultPtr > 0)
+    {
+      char c = domainName.charAt(resultPtr - 1);
+      if(c == '.')
+      {
+        result[resultPtr] = currLen;
+        currLen = 0;
+      }
+      else if((resultPtr - 1 == 0))
+      {
+        result[resultPtr] = (byte)c;
+        result[resultPtr - 1] = (byte)(currLen + 1);
+        break;
+      }
+      else
+      {
+        result[resultPtr] = (byte)c;
+        ++currLen;
+      }
+      --resultPtr;
+    }
+
+    return result;
   }
 
   private Question(Builder builder)
@@ -216,7 +272,7 @@ class QuestionRecord
     this.qclass = qclass;
   }
 
-  private final String qname;
-  private final QType qtype;
-  private final QClass qclass;
+  public final String qname;
+  public final QType qtype;
+  public final QClass qclass;
 }
