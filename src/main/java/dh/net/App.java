@@ -87,6 +87,8 @@ public class App
       System.out.println("Message from Server");
       App.printPacketAsBits(recvPacketData, 12);
 
+      Answer answer = Answer.answerFromByteStream(recvPacketData);
+
       socket.close();
     }
     catch(IOException e)
