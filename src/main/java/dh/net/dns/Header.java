@@ -1,5 +1,8 @@
 package dh.net.dns;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+
 import dh.net.dns.OpCode;
 import dh.net.dns.QType;
 import dh.net.dns.QClass;
@@ -117,6 +120,72 @@ public class Header
     private int answerCount = 0;
     private int nameServerCount = 0;
     private int additionalRecordCount = 0;
+  }
+
+  /**
+   * Returns this header encoded as a byte array capable of being sent to a
+   * DNS Server.
+   *
+   * @return 12 byte array to be sent to DNS server.
+   */
+  public byte[] headerAsByteArray()
+  {
+    // DNS Header is always 12 bytes (See comments above for formatting).
+    ByteBuffer buffer = ByteBuffer.allocate(12);
+    buffer.order(ByteOrder.BIG_ENDIAN);
+
+    // First store the ID number we've been given.
+    buffer.putShort((short)this.id);
+
+    // Next store the various flags as per the user's settings
+    //  MSB ---> LSB
+    //    0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
+    //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    //  |                      ID                       |
+    //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    //  |QR|   Opcode  |AA|TC|RD|RA|   Z    |   RCODE   |
+    //
+    int options = 0x000000;
+
+    // QR
+    if(!this.isQuery)
+    {
+      int mask = 0x8000;
+      options |= mask;
+    }
+
+    // OpCode
+    // TODO: OpCode only valid for QUERY
+   // int opCode = this.opCode.getValue();
+   // options |= opCode;
+
+    // Authoritative Answer
+    if(this.authorativeAnswer)
+    {
+      int mask = 0x400;
+      options |= mask;
+    }
+
+    // Recursion Desired
+    if(this.recursionDesired)
+    {
+      int mask = 0x100;
+      options |= mask;
+    }
+
+    // Take the first word and push into array.
+    buffer.putShort((short)options);
+
+    // Set number of questions, remainder of header is zeros.
+    buffer.putShort((short)questionCount);
+    // Answer Count == 0
+    buffer.putShort((short)answerCount);
+    // Name Server count == 0
+    buffer.putShort((short)nameServerCount);
+    // Additional Record Count == 0
+    buffer.putShort((short)additionalRecordCount);
+  
+    return buffer.array();
   }
 
   private Header(Builder builder)
