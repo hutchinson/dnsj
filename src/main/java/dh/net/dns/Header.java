@@ -75,6 +75,12 @@ public class Header
       return this;
     }
 
+    public Builder setRAFlag(boolean val)
+    {
+      this.recursionAvailable = val;
+      return this;
+    }
+
     public Builder setRCode(byte val)
     { 
       this.rcode = val;
@@ -186,6 +192,48 @@ public class Header
     buffer.putShort((short)additionalRecordCount);
   
     return buffer.array();
+  }
+
+  public int getQuestionCount()
+  {
+    return this.questionCount;
+  }
+
+  public int getAnswerCount()
+  {
+    return this.answerCount;
+  }
+
+  public int getAuthorityRecordCount()
+  {
+    return this.nameServerCount;
+  }
+
+  public int getAdditionalRecordCount()
+  {
+    return this.additionalRecordCount;
+  }
+
+  @Override
+  public String toString()
+  {
+    String result = "ID: " + this.id + "|" +
+                    "RCODE:" + this.rcode + "|" +
+                    "RA:" + this.recursionAvailable + "|" +
+                    "RD:" + this.recursionDesired + "|" +
+                    "TC:" + this.truncated + "|" +
+                    "AA:" + this.authorativeAnswer + "|" +
+                    "OPCODE:" + this.opCode.getValue() + "|" +
+                    "Q:" + this.isQuery + "|" +
+                    "Q-Count:" + this.questionCount + "|" +
+                    "A-Count:" + this.answerCount + "|" +
+                    "NS-Count:" + this.nameServerCount + "|" +
+                    "AR-Count:" + this.additionalRecordCount + "|";
+
+
+
+    return result;
+                    
   }
 
   private Header(Builder builder)

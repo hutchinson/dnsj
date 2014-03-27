@@ -54,9 +54,9 @@ public class App
   {
     Question.Builder qb = new Question.Builder();
     qb.setID(1);
-    //qb.setRecursionDesired(true);
     qb.setOpCode(OpCode.QUERY);
     qb.addQuestion("www.google.co.uk", QType.A, QClass.IN);
+    //qb.addQuestion("www.bbc.co.uk", QType.A, QClass.IN);
 
     Question googleQuestion = qb.build();
 
@@ -65,7 +65,7 @@ public class App
     if(packetToSend != null)
     {
       App.printPacketAsBits(packetToSend, 12);
-      //App.printQuestion(packetToSend);
+      App.printQuestion(packetToSend);
     }
 
     try
