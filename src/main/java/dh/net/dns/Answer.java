@@ -97,6 +97,43 @@ public class Answer
 
       --numQuestionsToSkip;
     }
+
+    // Parse each answer from the 'answer section'
+    int numAnswers = result.header.getAnswerCount();
+    while(numAnswers > 0)
+    {
+      // TODO Fill out answer processing logic.
+      --numAnswers;
+    }
+
+    // Parse each authority answer record.
+    int numAuthorityAnswers = result.header.getAuthorityRecordCount();
+    while(numAuthorityAnswers > 0)
+    {
+
+      --numAuthorityAnswers;
+    }
+
+    // Parse the addition record section
+    int additionalRecords = result.header.getAdditionalRecordCount();
+    while(additionalRecords > 0)
+    {
+      // Answer, Authority and additional record sections all share the same
+      // format.
+      //
+      // First a name, which is the domain name to which this resource record
+      // pertains.
+      //
+      // It can be encoded in the following ways:
+      //  - A sequence of labels ending in a '\0'
+      //  - A pointer
+      //  - A sequence of labels ending in a pointer.
+      //
+      // The presence of a pointer is denoted by the uppermost bits of the byte
+      // set to 11
+
+      --additionalRecords;
+    }
     return result;
   }
 
