@@ -56,7 +56,6 @@ public class App
     qb.setID(1);
     qb.setOpCode(OpCode.QUERY);
     qb.addQuestion("www.google.co.uk", QType.A, QClass.IN);
-    //qb.addQuestion("www.bbc.co.uk", QType.A, QClass.IN);
 
     Question googleQuestion = qb.build();
 
@@ -71,7 +70,6 @@ public class App
     try
     {
       byte[] dnsIPAddress = {(byte)193, (byte)0, (byte)14, (byte)129};
-      //byte[] dnsIPAddress = {(byte)255, (byte)1, (byte)168, (byte)192};
       DatagramSocket socket = new DatagramSocket();
       InetAddress addr = InetAddress.getByAddress(dnsIPAddress);
 
@@ -80,7 +78,7 @@ public class App
       socket.send(datagramPacket);
 
       // Get response
-      byte recvPacketData[] = new byte[256];
+      byte recvPacketData[] = new byte[65536];
       datagramPacket = new DatagramPacket(recvPacketData, recvPacketData.length);
       socket.receive(datagramPacket);
 
