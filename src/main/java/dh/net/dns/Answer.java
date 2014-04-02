@@ -3,6 +3,9 @@ package dh.net.dns;
 import dh.net.dns.QClass;
 import dh.net.dns.QType;
 
+
+import java.util.List;
+import java.util.ArrayList;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
@@ -38,6 +41,26 @@ public class Answer
       }
       return result;
     }
+  }
+
+  /**
+   * Returns true if the following conditions are met:
+   *
+   * The response does not contain an answer section but contains
+   * one or more authoritative name servers in the domain authority.
+   *
+   * Hopefully the DNS server will also have been a dear and filled out
+   * the additional answer section with glue records (corresponding IP
+   * addresses) for the name servers, however if it doesn't you may find
+   * yourself having to start a new query for those too!
+   *
+   * @return true if no authoritative answers are present but the
+   *         authoritative name server section contains records.
+   */
+  public boolean isReferralResponse()
+  {
+    return (this.authorativeAnswers.isEmpty() &&
+        !this.authorityNameservers.isEmpty());
   }
 
   /**
@@ -141,6 +164,7 @@ public class Answer
     while(numAnswers > 0)
     {
       ResourceRecord rr = Answer.nextRecord(fullPacketBuffer);
+      result.authorativeAnswers.add(rr);
       System.out.println(rr);
       --numAnswers;
     }
@@ -151,6 +175,7 @@ public class Answer
     while(numAuthorityAnswers > 0)
     {
       ResourceRecord rr = Answer.nextRecord(fullPacketBuffer);
+      result.authorityNameservers.add(rr);
       System.out.println(rr);
 
       --numAuthorityAnswers;
@@ -161,12 +186,9 @@ public class Answer
     System.out.println("Additional Records: " + additionalRecords);
     while(additionalRecords > 0)
     {
-      // Answer, Authority and additional record sections all share the same
-      // format.
-      //
       ResourceRecord rr = Answer.nextRecord(fullPacketBuffer);
+      result.additionalRecords.add(rr);
       System.out.println(rr);
-
       --additionalRecords;
     }
     return result;
@@ -295,6 +317,13 @@ public class Answer
 
   private Answer() {}
   private Header header;
+
+  private List<ResourceRecord> authorativeAnswers =
+    new ArrayList<>();
+  private List<ResourceRecord> authorityNameservers =
+    new ArrayList<>();
+  private List<ResourceRecord> additionalRecords =
+    new ArrayList<>();
 
 }
 
