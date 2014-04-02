@@ -188,49 +188,95 @@ public class Answer
     return result;
   }
 
-  /**
-   * Return a string that contains the domain name following
-   * DNS compression rules from the offset to the NULL octet.
-   *
-   * NOTE: THIS IS A ROUGH IMPLEMENTATION WITH A LOT OF DUPLICATED
-   * LOGIC, TO BE CLEANED UP!
-   */
-  private static String domainViaPointer(byte[] packet, int offset)
+  // Utility class to store the results of the expandDNS() function.
+  private static class DnsExpansionResult
   {
-    String result = "";
-    byte currStrLen;
+    // Name expansion should set this to the DNS name.
+    public String dnsName;
+    // The number of bytes from the initial offset provided
+    // that were consumed by the string before pointers were
+    // found.
+    public int offsetFromInitial;
+  }
 
-    while( (currStrLen = packet[offset++]) != 0x0)
+  /**
+   * Expands a domain name in a DNS packet for QNAME, NAME and RDATA fields
+   * following the compression scheme outlined in RFC 1035.
+   *
+   * Extended labels (RFC 2673 currently aren't supported).
+   *
+   * Note: in the RDATA case it must be applied to RDATA that represents
+   * chained fields.
+   */
+  private static DnsExpansionResult expandDNS(byte[] packet, int initialOffset)
+  {
+    // A domain name can be defined as
+    // 1). A regular sequence of labels.
+    // 2). A pointer.
+    // 3). A sequence of labels ending in a pointer.
+    DnsExpansionResult result = new DnsExpansionResult();
+    result.dnsName = "";
+
+    boolean shouldCountOffset = true;
+
+    int offset = initialOffset;
+
+    while(offset < packet.length)
     {
-      // Are we a pointer to another string or a string ourself?
-      if((currStrLen & 0xC0) != 0)
-      {
-        int newOffset = currStrLen & 0x3F;
-        newOffset = newOffset << 8;
-        int lowByte = packet[offset++] & 0xFF;
-        newOffset |= lowByte;
+      byte val = packet[offset++];
+      if(shouldCountOffset)
+        ++result.offsetFromInitial;
 
-        // TODO: By exiting out of the loop we assume that the call to
-        // domainViaPointer at this juncture caused us to find the
-        // end of the string this may not be the case!!!
-        result += domainViaPointer(packet, newOffset);
+      if(val == 0x0)
         break;
-      }
-      else
-      {
-        byte[] currStr = new byte[currStrLen];
-        int index = 0;
-        while(index < currStrLen)
-        {
-          currStr[index] = packet[offset++];
-          ++index;
-        }
 
-        // Append to result
-        result += "." + new String(currStr);
+      // Pointer
+      switch( (val & 0xC0) )
+      {
+        // Label
+        case 0x00:
+        {
+          byte[] label = new byte[val];
+          int index = 0;
+          while(index < val)
+          {
+            label[index++] = packet[offset++];
+            if(shouldCountOffset)
+              ++result.offsetFromInitial;
+          }
+
+          // Append label
+          result.dnsName += "." + new String(label);
+        }
+        break;
+
+        // Pointer
+        case 0xC0:
+        {
+          // Move the pointer to the offset described and continue
+          // reading from there.
+          int newOffset = val & 0x3F;
+          newOffset = newOffset << 8;
+
+          int lowByte = packet[offset++] & 0xFF;
+          if(shouldCountOffset)
+            ++result.offsetFromInitial;
+          newOffset |= lowByte;
+          shouldCountOffset = false;
+
+          offset = newOffset;
+        }
+        break;
+
+        // TODO: Could be extended label (RFC 2673) or other
+        // error.
+        default:
+          throw new IllegalArgumentException("Unsupported DNS label type, aborting.");
       }
     }
 
+    // Trim the leading '.'
+    result.dnsName = result.dnsName.substring(1);
     return result;
   }
 
@@ -243,51 +289,11 @@ public class Answer
     ResourceRecord result = new ResourceRecord();
 
     // Each RR begins with the domain to which the RR pertains.
-    String domain = "";
-    // A domain name can be defined as
-    // 1). A regular sequence of labels.
-    // 2). A pointer.
-    // 3). A sequence of labels ending in a pointer.
-    //
-    // Is this case (2)
-    int currStrLen = packet.get();
-    if((currStrLen & 0xC0) !=0)
-    {
-      int offset = currStrLen & 0x3F;
-      offset = offset << 8;
-      // TODO: Find better way to interpret 'un-signed'
-      // data.
-      int lowByte = packet.get() & 0xFF;
-      offset |= lowByte;
-      domain = Answer.domainViaPointer(packet.array(), offset);
-    }
-    else
-    {
-      while(currStrLen != 0x0)
-      {
-        if((currStrLen & 0xC0) != 0x0)
-        {
-          // This is case (3).
-          int offset = currStrLen & 0x3F;
-          offset = offset << 8;
-          int lowByte = packet.get() & 0xFF;
-          offset |= lowByte;
-
-          domain += "." + Answer.domainViaPointer(packet.array(), offset);
-          break;
-        }
-        else
-        {
-          byte[] curStr = new byte[currStrLen];
-          packet.put(curStr, 0, currStrLen);
-          domain += "." + new String(curStr);
-          currStrLen = packet.get();
-        }
-      }
-    }
-
-    // Trim the leading '.' added as an artefact of the algorithm.
-    result.domainName = domain.substring(1);
+    int currentOffset = packet.position();
+    DnsExpansionResult expansionResult =
+      Answer.expandDNS(packet.array(), currentOffset);
+    result.domainName = expansionResult.dnsName;
+    packet.position(currentOffset + expansionResult.offsetFromInitial);
 
     // Next is type.
     int type = packet.getShort();
