@@ -63,8 +63,9 @@ public class App
 
     if(packetToSend != null)
     {
+      System.out.println("Binary Header to Server");
       App.printPacketAsBits(packetToSend, 12);
-      App.printQuestion(packetToSend);
+      //App.printQuestion(packetToSend);
     }
 
     try
@@ -82,7 +83,7 @@ public class App
       datagramPacket = new DatagramPacket(recvPacketData, recvPacketData.length);
       socket.receive(datagramPacket);
 
-      System.out.println("Message from Server");
+      System.out.println("Binary Header from Server");
       App.printPacketAsBits(recvPacketData, 12);
 
       Answer answer = Answer.answerFromByteStream(recvPacketData);

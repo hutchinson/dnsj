@@ -72,10 +72,7 @@ public class Answer
     Answer result = new Answer();
 
     if(answerStream.length < 12)
-    {
-      System.out.println("Byte stream less than minimum header size.");
-      return null;
-    }
+      throw new IllegalArgumentException("Byte stream less than minimum header size.");
 
     // Parse the header.
     Header.Builder headerBuilder = new Header.Builder();
@@ -145,10 +142,10 @@ public class Answer
       byte b = fullPacketBuffer.get();
       // TODO: This will only work if the question wasn't compressed
       // which we assume for now, it wasn't.
+
       // Read the domain name until a '\0'
       while(b != 0x0)
       {
-        System.out.print((char)b);
         b = fullPacketBuffer.get();
       }
       System.out.println();
@@ -160,7 +157,6 @@ public class Answer
 
     // Parse each answer from the 'answer section'
     int numAnswers = result.header.getAnswerCount();
-    System.out.println("Answer Record: " + numAnswers);
     while(numAnswers > 0)
     {
       ResourceRecord rr = Answer.nextRecord(fullPacketBuffer);
@@ -171,7 +167,6 @@ public class Answer
 
     // Parse each authority nameserver record.
     int numAuthorityAnswers = result.header.getAuthorityRecordCount();
-    System.out.println("Authoritative Nameserver Record: " + numAuthorityAnswers);
     while(numAuthorityAnswers > 0)
     {
       ResourceRecord rr = Answer.nextRecord(fullPacketBuffer);
@@ -183,7 +178,6 @@ public class Answer
 
     // Parse the addition record section
     int additionalRecords = result.header.getAdditionalRecordCount();
-    System.out.println("Additional Records: " + additionalRecords);
     while(additionalRecords > 0)
     {
       ResourceRecord rr = Answer.nextRecord(fullPacketBuffer);
