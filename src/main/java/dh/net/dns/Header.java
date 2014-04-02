@@ -161,9 +161,8 @@ public class Header
     }
 
     // OpCode
-    // TODO: OpCode only valid for QUERY
-   // int opCode = this.opCode.getValue();
-   // options |= opCode;
+    int opCode = this.opCode.getValue();
+    options |= opCode;
 
     // Authoritative Answer
     if(this.authorativeAnswer)
