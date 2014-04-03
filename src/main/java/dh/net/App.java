@@ -56,45 +56,17 @@ public class App
     qb.setID(1);
     qb.setOpCode(OpCode.QUERY);
     qb.addQuestion("www.google.co.uk", QType.A, QClass.IN);
-
     Question googleQuestion = qb.build();
 
     byte packetToSend[] = googleQuestion.getPacket();
-
     if(packetToSend != null)
     {
       System.out.println("Binary Header to Server");
       App.printPacketAsBits(packetToSend, 12);
-      //App.printQuestion(packetToSend);
     }
 
-    try
-    {
-      byte[] dnsIPAddress = {(byte)193, (byte)0, (byte)14, (byte)129};
-      DatagramSocket socket = new DatagramSocket();
-      InetAddress addr = InetAddress.getByAddress(dnsIPAddress);
-
-      DatagramPacket datagramPacket =
-        new DatagramPacket(packetToSend, packetToSend.length, addr, 53);
-      socket.send(datagramPacket);
-
-      // Get response
-      byte recvPacketData[] = new byte[65536];
-      datagramPacket = new DatagramPacket(recvPacketData, recvPacketData.length);
-      socket.receive(datagramPacket);
-
-      System.out.println("Binary Header from Server");
-      App.printPacketAsBits(recvPacketData, 12);
-
-      Answer answer = Answer.answerFromByteStream(recvPacketData);
-
-      socket.close();
-    }
-    catch(IOException e)
-    {
-      e.printStackTrace();
-      System.exit(-1);
-    }
+    DnsSystem dnsSystem = new DnsSystem();
+    dnsSystem.query(googleQuestion);
   }
 }
 
