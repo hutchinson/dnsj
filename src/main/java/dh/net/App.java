@@ -59,11 +59,11 @@ public class App
     Question googleQuestion = qb.build();
 
     byte packetToSend[] = googleQuestion.getPacket();
-    if(packetToSend != null)
-    {
-      System.out.println("Binary Header to Server");
-      App.printPacketAsBits(packetToSend, 12);
-    }
+//    if(packetToSend != null)
+//    {
+//      System.out.println("Binary Header to Server");
+//      App.printPacketAsBits(packetToSend, 12);
+//    }
 
     DnsResolver resolver = new DnsResolver();
     resolver.query(googleQuestion);
