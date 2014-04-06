@@ -5,6 +5,8 @@ import dh.net.dns.QType;
 
 
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.ArrayList;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -39,6 +41,11 @@ public class Answer
                            String.valueOf(0xFF & data[3]);
         result += ipAddress;
       }
+      else if(type == QType.NS)
+      {
+        String nameserverAddr = " | " + new String(data);
+        result += nameserverAddr;
+      }
       return result;
     }
   }
@@ -61,6 +68,34 @@ public class Answer
   {
     return (this.authorativeAnswers.isEmpty() &&
         !this.authorityNameservers.isEmpty());
+  }
+
+  /**
+   * Return the list of name servers that we can use in referrals.
+   */
+  public Map<String, ResourceRecord> referralNameservers()
+  {
+    Map<String, ResourceRecord> result = new HashMap<>();
+
+    // TODO: re-write using aggregate operations.
+    // TODO: tidy up data structures used in parsing to use map
+    // instead of these lists...
+    for(ResourceRecord rr : authorityNameservers)
+    {
+      if(rr.type == QType.NS && rr.recordClass == QClass.IN)
+      {
+        String nameServer = new String(rr.data);
+        for(ResourceRecord aRR : additionalRecords)
+        {
+          if(aRR.domainName.compareTo(nameServer) == 0 &&
+             aRR.type == QType.A && aRR.recordClass == QClass.IN)
+          {
+            result.put(nameServer, aRR);
+          }
+        }
+      }
+    }
+    return result;
   }
 
   /**
@@ -159,6 +194,7 @@ public class Answer
     while(numAnswers > 0)
     {
       ResourceRecord rr = Answer.nextRecord(fullPacketBuffer);
+      System.out.println(rr);
       result.authorativeAnswers.add(rr);
       --numAnswers;
     }
@@ -168,6 +204,7 @@ public class Answer
     while(numAuthorityAnswers > 0)
     {
       ResourceRecord rr = Answer.nextRecord(fullPacketBuffer);
+      System.out.println(rr);
       result.authorityNameservers.add(rr);
       --numAuthorityAnswers;
     }
@@ -300,13 +337,28 @@ public class Answer
     long ttl = packet.getInt();
     result.ttl = ttl;
 
-    int rdlength = packet.getShort();
-    result.dataLength = rdlength;
+    // Certain types of records contain domain names too.
+    if(result.type == QType.NS)
+    {
+      int rdlength = packet.getShort();
 
-    byte[] rdData = new byte[rdlength];
-    packet.get(rdData, 0, rdlength);
-    result.data = rdData;
+      currentOffset = packet.position();
+      expansionResult =
+        Answer.expandDNS(packet.array(), currentOffset);
 
+      packet.position(currentOffset + expansionResult.offsetFromInitial);
+      result.dataLength = expansionResult.dnsName.length();
+      result.data = expansionResult.dnsName.getBytes();
+    }
+    else
+    {
+      int rdlength = packet.getShort();
+      result.dataLength = rdlength;
+
+      byte[] rdData = new byte[rdlength];
+      packet.get(rdData, 0, rdlength);
+      result.data = rdData;
+    }
     return result;
   }
 
