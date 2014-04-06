@@ -132,7 +132,6 @@ public class Answer
     headerBuilder.setARCount(arCount);
 
     result.header = headerBuilder.build();
-    System.out.println(result.header);
 
     // Now we know what the packet contains, parse its contents.
     int numQuestionsToSkip = result.header.getQuestionCount();
@@ -161,7 +160,6 @@ public class Answer
     {
       ResourceRecord rr = Answer.nextRecord(fullPacketBuffer);
       result.authorativeAnswers.add(rr);
-      System.out.println(rr);
       --numAnswers;
     }
 
@@ -171,8 +169,6 @@ public class Answer
     {
       ResourceRecord rr = Answer.nextRecord(fullPacketBuffer);
       result.authorityNameservers.add(rr);
-      System.out.println(rr);
-
       --numAuthorityAnswers;
     }
 
@@ -182,7 +178,6 @@ public class Answer
     {
       ResourceRecord rr = Answer.nextRecord(fullPacketBuffer);
       result.additionalRecords.add(rr);
-      System.out.println(rr);
       --additionalRecords;
     }
     return result;

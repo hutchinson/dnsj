@@ -65,8 +65,8 @@ public class App
       App.printPacketAsBits(packetToSend, 12);
     }
 
-    DnsSystem dnsSystem = new DnsSystem();
-    dnsSystem.query(googleQuestion);
+    DnsResolver resolver = new DnsResolver();
+    resolver.query(googleQuestion);
   }
 }
 
