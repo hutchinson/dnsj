@@ -136,6 +136,7 @@ public class DnsResolver
     // Next, wait for a response from any of the name servers.
     while(aq.pendingResponseNumRetry > 0)
     {
+      System.out.println("Waiting on " + aq.pendingResponses.keys().size() + " channels");
       try
       {
         int numReadyChannels =
@@ -143,9 +144,9 @@ public class DnsResolver
 
         if(numReadyChannels > 0)
         {
-          System.out.println(numReadyChannels + " ready channels.");
           // Get the channels that say they're ready.
           Set<SelectionKey> selectedKeys = aq.pendingResponses.selectedKeys();
+          System.out.println(selectedKeys.size() + " ready channels.");
 
           // Get any responses from the server.
           Iterator<SelectionKey> keyIterator = selectedKeys.iterator();
@@ -165,7 +166,21 @@ public class DnsResolver
               // a new request.
               if(response.isReferralResponse())
               {
-                System.out.println("Got referral response!");
+                System.out.println("Got referral");
+                // Create a new zone which contains the name servers we're
+                // being suggested could help.
+                Zone newZone = zoneFromResponse(response);
+
+                // Reset the active query.
+                aq.pendingResponseNumRetry = 5;
+                aq.currentZone = newZone;
+
+                // Send out the query again to the name servers in the zone
+                // hopefully closer to our answer!
+                deliverQueryToCurrentZone(aq.originalQuestion, aq);
+                // Use the first response from any server in the, now, old zone
+                // so break out of this loop.
+                break;
               }
             }
 
@@ -183,6 +198,22 @@ public class DnsResolver
         e.printStackTrace();
       }
     }
+  }
+
+  private Zone zoneFromResponse(Answer response)
+  {
+    Zone result = new Zone();
+    Map<String, Answer.ResourceRecord> newNameServers = response.referralNameservers();
+
+    for(Map.Entry<String, Answer.ResourceRecord> ns : newNameServers.entrySet())
+    {
+      System.out.println("\t" + ns.getKey() + " " + ns.getValue() );
+      byte[] ipv4 = ns.getValue().data;
+
+      result.knownNameServers.add(
+          new Nameserver(ns.getKey(), ipv4[0], ipv4[1], ipv4[2], ipv4[3]));
+    }
+    return result;
   }
 
   // Delivers the specified query to al) name servers in the
