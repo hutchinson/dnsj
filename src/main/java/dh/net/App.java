@@ -52,21 +52,9 @@ public class App
 
   public static void main( String[] args )
   {
-    Question.Builder qb = new Question.Builder();
-    qb.setID(1);
-    qb.setOpCode(OpCode.QUERY);
-    qb.addQuestion("www.google.co.uk", QType.A, QClass.IN);
-    Question googleQuestion = qb.build();
-
-    byte packetToSend[] = googleQuestion.getPacket();
-//    if(packetToSend != null)
-//    {
-//      System.out.println("Binary Header to Server");
-//      App.printPacketAsBits(packetToSend, 12);
-//    }
-
     DnsResolver resolver = new DnsResolver();
-    resolver.query(googleQuestion);
+    Answer.ResourceRecord rr = resolver.query("www.google.com", QType.A, QClass.IN);
+    System.out.println(rr);
   }
 }
 

@@ -33,7 +33,9 @@ public class DnsResolver
 
   public DnsResolver()
   {
-    taskQueue = Executors.newSingleThreadExecutor();
+    this.nextQueryID = 0;
+    this.inProgressQueries = new LinkedList<>();
+    this.rrCache = new ConcurrentHashMap<>();
   }
 
   /**
@@ -41,7 +43,6 @@ public class DnsResolver
    */
   private class Nameserver
   {
-
     public Nameserver(String hostName, int b1, int b2, int b3, int b4)
     {
       this.hostName = hostName;
@@ -98,19 +99,70 @@ public class DnsResolver
     }
   }
 
+  ////////////////////////////////////////////////////////////////////////////
+
+  /**
+   * Class used to lookup resource records in our internal cache
+   */
+  private class ResourceRecordKey
+  {
+    public ResourceRecordKey(String n, QType t, QClass q)
+    {
+      name = n;
+      type = t;
+      qClass = q;
+    }
+
+    public String name;
+    public QType type;
+    public QClass qClass;
+
+    @Override
+    public boolean equals(Object o)
+    {
+      if(o == this)
+        return true;
+
+      if(!(o instanceof ResourceRecordKey))
+        return false;
+
+      ResourceRecordKey rhs = (ResourceRecordKey)o;
+      if(name.equals(rhs.name) &&
+         type == rhs.type &&
+         qClass == rhs.qClass)
+      {
+        return true;
+      }
+      return false;
+    }
+
+    @Override
+    public int hashCode()
+    {
+      int result = 17;
+      result = 31 * result + name.hashCode();
+      result = 31 * result + type.getValue();
+      result = 31 * result + qClass.getValue();
+      return result;
+    }
+  }
+
+  ////////////////////////////////////////////////////////////////////////////
   private class Zone
   {
     public Set<Nameserver> knownNameServers =
       Collections.synchronizedSet(new HashSet<Nameserver>());
   }
 
+  ////////////////////////////////////////////////////////////////////////////
+
   /**
    * This represents a query that the resolver is currently working
    * on resolving the answer to.
    */
-  private class ActiveQuery
+  private class Query
   {
-    public Question originalQuestion;
+    public Question question;
     public Zone currentZone;
 
     // Used to store nameservers we're currently awaiting responses
@@ -119,85 +171,101 @@ public class DnsResolver
     public int pendingResponseNumRetry;
   }
 
-  // First implementation won't use local caches.
-  public void query(Question dnsQuery)
+  public Answer.ResourceRecord query(String name, QType type, QClass qClass)
   {
+    Question.Builder qb = new Question.Builder();
+    qb.setID(nextID());
+    qb.setOpCode(OpCode.QUERY);
+    qb.addQuestion(name, type, qClass);
+    Question initialQuestion = qb.build();
+
     // Generate the query object and store the root zone as the
     // current query.
-    ActiveQuery aq = new ActiveQuery();
-    aq.pendingResponseNumRetry = 5;
-    aq.originalQuestion = dnsQuery;
-    aq.currentZone = rootZone();
+    Query query = new Query();
+    query.pendingResponseNumRetry = 5;
+    query.question = initialQuestion;
+    query.currentZone = rootZone();
 
-    // First step is to send out the original query to
-    // all name servers in the root zone.
-    deliverQueryToCurrentZone(aq.originalQuestion, aq);
+    // Push the query to the inpr query queue
+    inProgressQueries.addFirst(query);
 
-    // Next, wait for a response from any of the name servers.
-    while(aq.pendingResponseNumRetry > 0)
+    // Work the query in progress queue until it's empty
+    while(inProgressQueries.peek() != null)
     {
-      System.out.println("Waiting on " + aq.pendingResponses.keys().size() + " channels");
-      try
+      // Always work from the top of the stack.
+      Query aq = inProgressQueries.peekFirst();
+
+      // First step is to send out the question to
+      // all name servers in the current zone.
+      deliverQueryToCurrentZone(aq.question, aq);
+
+      // Next, wait for a response from any of the name servers.
+      while(aq.pendingResponseNumRetry > 0)
       {
-        int numReadyChannels =
-          aq.pendingResponses.select(DnsResolver.PER_SELECT_TIMEOUT);
-
-        if(numReadyChannels > 0)
+        try
         {
-          // Get the channels that say they're ready.
-          Set<SelectionKey> selectedKeys = aq.pendingResponses.selectedKeys();
-          System.out.println(selectedKeys.size() + " ready channels.");
+          int numReadyChannels =
+            aq.pendingResponses.select(DnsResolver.PER_SELECT_TIMEOUT);
 
-          // Get any responses from the server.
-          Iterator<SelectionKey> keyIterator = selectedKeys.iterator();
-          while(keyIterator.hasNext())
+          if(numReadyChannels > 0)
           {
-            SelectionKey key = keyIterator.next();
+            // Get the channels that say they're ready.
+            Set<SelectionKey> selectedKeys =
+              aq.pendingResponses.selectedKeys();
 
-            if(key.isReadable())
+            // Get any responses from the server.
+            Iterator<SelectionKey> keyIterator = selectedKeys.iterator();
+            while(keyIterator.hasNext())
             {
-              DatagramChannel channel = (DatagramChannel)key.channel();
-              ByteBuffer recvBuff = ByteBuffer.allocate(65536);
-              int bytesReady = channel.read(recvBuff);
+              SelectionKey key = keyIterator.next();
 
-              Answer response = Answer.answerFromByteStream(recvBuff.array());
-
-              // See if we have a referral, this means we need to generate
-              // a new request.
-              if(response.isReferralResponse())
+              if(key.isReadable())
               {
-                System.out.println("Got referral");
-                // Create a new zone which contains the name servers we're
-                // being suggested could help.
-                Zone newZone = zoneFromResponse(response);
+                DatagramChannel channel = (DatagramChannel)key.channel();
+                ByteBuffer recvBuff = ByteBuffer.allocate(65536);
+                int bytesReady = channel.read(recvBuff);
 
-                // Reset the active query.
-                aq.pendingResponseNumRetry = 5;
-                aq.currentZone = newZone;
+                Answer response = Answer.answerFromByteStream(recvBuff.array());
 
-                // Send out the query again to the name servers in the zone
-                // hopefully closer to our answer!
-                deliverQueryToCurrentZone(aq.originalQuestion, aq);
-                // Use the first response from any server in the, now, old zone
-                // so break out of this loop.
-                break;
+                // See if we have a referral, this means we need to generate
+                // a new request.
+                if(response.isReferralResponse())
+                {
+                  System.out.println("Got referral");
+                  // Create a new zone which contains the name servers we're
+                  // being suggested could help.
+                  Zone newZone = zoneFromResponse(response);
+
+                  // Reset the active query.
+                  aq.pendingResponseNumRetry = 5;
+                  aq.currentZone = newZone;
+
+                  // Send out the query again to the name servers in the zone
+                  // hopefully closer to our answer!
+                  deliverQueryToCurrentZone(aq.question, aq);
+                  // Use the first response from any server in the, now, old zone
+                  // so break out of this loop.
+                  break;
+                }
               }
-            }
 
-            keyIterator.remove();
+              keyIterator.remove();
+            }
+          }
+          else
+          {
+            System.out.println("Timed out.");
+            --aq.pendingResponseNumRetry;
           }
         }
-        else
+        catch(IOException e)
         {
-          System.out.println("Timed out.");
-          --aq.pendingResponseNumRetry;
+          e.printStackTrace();
         }
       }
-      catch(IOException e)
-      {
-        e.printStackTrace();
-      }
     }
+
+    return null;
   }
 
   private Zone zoneFromResponse(Answer response)
@@ -218,7 +286,7 @@ public class DnsResolver
 
   // Delivers the specified query to al) name servers in the
   // current zone.
-  private void deliverQueryToCurrentZone(Question query, ActiveQuery aq)
+  private void deliverQueryToCurrentZone(Question query, Query aq)
   {
     try
     {
@@ -272,7 +340,43 @@ public class DnsResolver
     return result;
   }
 
-  private static final int PER_SELECT_TIMEOUT = 2000;
-  private ExecutorService taskQueue;
+  /**
+   * Will return a value in the first 16 bits of the result that are
+   * to be used in the ID field of the DNS header.
+   */
+  private int nextID()
+  {
+    nextQueryID++;
+    if(nextQueryID > 65535)
+      nextQueryID = 0;
+    
+    return nextQueryID;
+  }
 
+  private void addRRToCache(Answer.ResourceRecord rr)
+  {
+    ResourceRecordKey key =
+      new ResourceRecordKey(rr.domainName, rr.type, rr.recordClass);
+
+    Deque<Answer.ResourceRecord> records = rrCache.get(key);
+    if(records == null)
+    {
+      records = new LinkedList<>();
+      rrCache.put(key, records);
+    }
+
+    records.addFirst(rr);
+
+    System.out.println(rrCache);
+  }
+
+  private int nextQueryID;
+  private static final int PER_SELECT_TIMEOUT = 2000;
+
+  // Used to maintain a stack
+  private Deque<Query> inProgressQueries;
+
+  // Cache of resource records that we've received while traversing.
+  Map<ResourceRecordKey, Deque<Answer.ResourceRecord>> rrCache;
 }
+

@@ -167,6 +167,7 @@ public class Answer
     headerBuilder.setARCount(arCount);
 
     result.header = headerBuilder.build();
+    System.out.println(result.header);
 
     // Now we know what the packet contains, parse its contents.
     int numQuestionsToSkip = result.header.getQuestionCount();
