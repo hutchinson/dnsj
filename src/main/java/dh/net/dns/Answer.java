@@ -27,15 +27,14 @@ public class Answer
 
     public String toString()
     {
-      String result = "Domain: " + domainName + " | " +
-                      "RR Type: " + type + " | " +
-                      "Class : " + recordClass + " | " +
-                      "TTL: " + ttl + " | " +
-                      "RDLENGTH: " + dataLength;
+      String result = domainName + "\t" +
+                      ttl + "\t" +
+                      recordClass + "\t" +
+                      type + "\t";
 
       if(type == QType.A)
       {
-        String ipAddress = " | " + String.valueOf(0xFF & data[0]) + "." +
+        String ipAddress = String.valueOf(0xFF & data[0]) + "." +
                            String.valueOf(0xFF & data[1]) + "." +
                            String.valueOf(0xFF & data[2]) + "." +
                            String.valueOf(0xFF & data[3]);
@@ -43,7 +42,7 @@ public class Answer
       }
       else if(type == QType.NS)
       {
-        String nameserverAddr = " | " + new String(data);
+        String nameserverAddr = new String(data);
         result += nameserverAddr;
       }
       return result;
