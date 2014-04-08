@@ -169,6 +169,9 @@ public class DnsResolver
    */
   private class Query
   {
+    // TODO: This needs to be a stack, or some structure that allows
+    // us to store things we're awaiting on from questions we launched
+    // as a result of our query.
     public Question question;
     public Zone currentZone;
 
@@ -226,6 +229,7 @@ public class DnsResolver
       else if(inProgressQueries.size() > 1 && rrFromCache != null)
       {
         // Pop ourselves of the stack and continue
+        System.out.println("Found answer" + rrFromCache);
         inProgressQueries.removeFirst();
         continue;
       }
@@ -279,9 +283,9 @@ public class DnsResolver
 
             // See if we have a referral, this means we need to generate
             // a new request.
-            if(response.isReferralResponse())
+            if(response.isFullReferralResponse())
             {
-              System.out.println("Got referral");
+              System.out.println("Got referral.");
               // Create a new zone which contains the name servers we're
               // being suggested could help.
               Zone newZone = zoneFromResponse(response);
@@ -292,11 +296,44 @@ public class DnsResolver
 
               // Break out the loop and let the next round check if we got
               // lucky in the cache, or, transmit this new query.
-              // Send out the query again to the name servers in the zone
-              // hopefully closer to our answer!
-              //deliverQueryToCurrentZone(aq.question, aq);
               return 0;
             }
+//            else if(response.hasNameserverHints())
+//            {
+//              // We might hit this if we reached a name server that new of
+//              // another name server that could provide us with a response
+//              // but wasn't kind enough to provide us with a glue record!
+//              //
+//              // In which case, we build a new DNS Question packet.
+//              // Generate a new Query stick it on the top of the stack
+//              // and start the processing loop again!
+//              Question.Builder qb = new Question.Builder();
+//              qb.setID(nextID());
+//              qb.setOpCode(OpCode.QUERY);
+//
+//              List<Answer.ResourceRecord> nsList =
+//                response.getAuthorityNameservers();
+//              Answer.ResourceRecord first = nsList.get(0);
+//              qb.addQuestion(new String(first.data), first.type, first.recordClass);
+//            //  for(Answer.ResourceRecord rr : nsList)
+//            //  {
+//            //    System.out.println("Adding " + rr + " to new question");
+//            //    qb.addQuestion(new String(rr.data), rr.type, rr.recordClass);
+//            //  }
+//
+//              Question newQuestion = qb.build();
+//
+//              // Generate the query object and store the root zone as the
+//              // current query.
+//              Query query = new Query();
+//              query.pendingResponseNumRetry = 5;
+//              query.question = newQuestion;
+//              query.currentZone = rootZone();
+//
+//              // Push the query to the inpr query queue
+//              inProgressQueries.addFirst(query);
+//              return 0;
+//            }
           }
 
           keyIterator.remove();
@@ -354,6 +391,8 @@ public class DnsResolver
       // Create a new Selector to allow us to multiplex the UDP packets
       if(aq.pendingResponses != null)
       {
+        // TODO: Also clean up all channels in the selector calling close
+        // on them, otherwise we'll run out of filehandles!!!!
         aq.pendingResponses.close();
       }
 
@@ -361,6 +400,7 @@ public class DnsResolver
       aq.pendingResponses = Selector.open();
 
       byte[] packetData = query.getPacket();
+      System.out.println(aq.currentZone.knownNameServers.size() + " NS to contact");
       // Send packet to each name server in the current zone.
       for(Nameserver ns : aq.currentZone.knownNameServers)
       {

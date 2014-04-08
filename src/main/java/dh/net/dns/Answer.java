@@ -63,15 +63,26 @@ public class Answer
    * @return true if no authoritative answers are present but the
    *         authoritative name server section contains records.
    */
-  public boolean isReferralResponse()
+  public boolean isFullReferralResponse()
   {
     return (this.authorativeAnswers.isEmpty() &&
-        !this.authorityNameservers.isEmpty());
+        (!this.authorityNameservers.isEmpty() &&
+        !this.additionalRecords.isEmpty()) );
+  }
+
+  public boolean hasNameserverHints()
+  {
+    return !this.authorityNameservers.isEmpty();
   }
 
   public List<ResourceRecord> getAuthorityAnswers()
   {
     return authorativeAnswers;
+  }
+
+  public List<ResourceRecord> getAuthorityNameservers()
+  {
+    return authorityNameservers;
   }
 
   /**
@@ -171,7 +182,6 @@ public class Answer
     headerBuilder.setARCount(arCount);
 
     result.header = headerBuilder.build();
-    System.out.println(result.header);
 
     // Now we know what the packet contains, parse its contents.
     int numQuestionsToSkip = result.header.getQuestionCount();
@@ -199,7 +209,6 @@ public class Answer
     while(numAnswers > 0)
     {
       ResourceRecord rr = Answer.nextRecord(fullPacketBuffer);
-      System.out.println(rr);
       result.authorativeAnswers.add(rr);
       --numAnswers;
     }
@@ -209,7 +218,6 @@ public class Answer
     while(numAuthorityAnswers > 0)
     {
       ResourceRecord rr = Answer.nextRecord(fullPacketBuffer);
-      System.out.println(rr);
       result.authorityNameservers.add(rr);
       --numAuthorityAnswers;
     }
