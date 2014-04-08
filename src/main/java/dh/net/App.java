@@ -54,7 +54,7 @@ public class App
   {
     DnsResolver resolver = new DnsResolver();
     Answer.ResourceRecord rr = resolver.query("www.google.com", QType.A, QClass.IN);
-    System.out.println(rr);
+    System.out.println("Query Result: " + rr);
   }
 }
 

@@ -140,6 +140,11 @@ public class Question
     return result;
   }
 
+  public Vector<QuestionRecord> getQuestions()
+  {
+    return questions;
+  }
+
   private Question(Builder builder)
   {
     this.header = builder.headerBuilder.build();

@@ -69,6 +69,11 @@ public class Answer
         !this.authorityNameservers.isEmpty());
   }
 
+  public List<ResourceRecord> getAuthorityAnswers()
+  {
+    return authorativeAnswers;
+  }
+
   /**
    * Return the list of name servers that we can use in referrals.
    */
