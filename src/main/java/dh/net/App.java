@@ -2,10 +2,6 @@ package dh.net;
 
 import dh.net.dns.*;
 
-import java.io.*;
-import java.net.*;
-import java.util.*;
-
 public class App
 {
   public static void printPacketAsBits(byte data[], int numBytes)

@@ -4,8 +4,6 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 import dh.net.dns.OpCode;
-import dh.net.dns.QType;
-import dh.net.dns.QClass;
 
 /**
  * Encapsulates the logic required for created and parsing

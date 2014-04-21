@@ -1,7 +1,5 @@
 package dh.net.dns;
 
-import dh.net.dns.*;
-
 import java.io.*;
 import java.net.*;
 import java.util.*;
